@@ -7,6 +7,7 @@
 #   Put trap_daemon.sh into /config/boot/ folder to run the daemon during boot
 #
 TIMEOUT=90    # Maximum time to do network reconnect before restart the shell
+SLEEP_TIME=5  # Time between checks
 TRACE=$1      # Print debug messages to STDOUT when argument is 1
 TRACE=${TRACE:-0}
 SCRIPT_NAME=${0##*/}
@@ -72,7 +73,7 @@ start=$(date "+%s")
 secs=0
 if [[ $count > 0 ]]; then
   while [[ true ]]; do
-    sleep 1;
+    sleep $SLEEP_TIME;
     secs=$(( $(date "+%s") - $start ))
     newcount=$(netstat -apnt 2>/dev/null |grep -E "$src\s+$dst\s+ESTABLISHED\s+$pid/" |awk '{print $2}')
     if [[ $count == $newcount ]]; then
@@ -83,7 +84,7 @@ if [[ $count > 0 ]]; then
                 # the network is dead
                 # wget 'http://127.0.0.1/cgi-bin/do?cmd=main_screen'; rm -f 'do?cmd=main_screen'
                 if [[  $secs > $TIMEOUT ]]; then
-                    echo kill -15 $pid
+                    kill -15 $pid
                     trace "Signal sent"
                     break
                 fi
@@ -114,5 +115,5 @@ else
     trace "$(date -u)\t$count\t$src\t$dst\t$pid\t Nothing..."
 fi
 
-sleep 1;
+sleep $SLEEP_TIME;
 done
