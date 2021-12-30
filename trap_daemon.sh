@@ -6,8 +6,8 @@
 # Otherwise:
 #   Put trap_daemon.sh into /config/boot/ folder to run the daemon during boot
 #
-TIMEOUT=90    # Maximum time to do network reconnect before restart the shell
-SLEEP_TIME=5  # Time between checks
+TIMEOUT=85    # Maximum time to do network reconnect before restart the shell
+SLEEP_TIME=10 # Time between checks
 TRACE=$1      # Print debug messages to STDOUT when argument is 1
 TRACE=${TRACE:-0}
 SCRIPT_NAME=${0##*/}
@@ -18,7 +18,7 @@ function is_net_alive {
 }
 
 function get_socket {
-    netstat -apnt 2>/dev/null |grep /shell |awk '{if($2 > 10000 && $6=="ESTABLISHED"){split($4,fm,"."); split($5,to,"."); if(!(fm[1]==to[1]&& fm[2]==to[2] && fm[3]==to[3])){print $2,$4,$5,$7;}}}'
+    netstat -apnt 2>/dev/null |grep /shell |awk '{if($2 > 1000 && $6=="ESTABLISHED"){split($4,fm,"."); split($5,to,"."); if(!(fm[1]==to[1]&& fm[2]==to[2] && fm[3]==to[3])){print $2,$4,$5,$7;}}}'
 }
 
 function trace {
@@ -44,7 +44,7 @@ DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
 FULLNAME="$DIR/$SCRIPT_NAME"
 # Found
 
-echo -e "$(date -u)\tCount= $(ps axww |grep -v grep |grep -c $SCRIPT_NAME)" >>$LOGNAME
+# echo -e "$(date -u)\tCount= $(ps axww |grep -v grep |grep -c $SCRIPT_NAME)" >>$LOGNAME
 if [[ $(ps axww |grep -v grep |grep -c $SCRIPT_NAME ) > 2 ]]; then
     echo -e "$(date -u)\tAlready run - exiting" >>$LOGNAME
     exit
@@ -55,7 +55,7 @@ if [[ $TRACE == 200 ]]; then
     sleep 60
 
 elif [[ $TRACE == 0 ]]; then
-    echo -e "$(date -u)\tTrying to start as daemon" >>$LOGNAME
+    echo -e "$(date -u)\tTrying to start as a daemon" >$LOGNAME  # Clean log file here
     nohup $FULLNAME 200 0<&- &>/dev/null &
     exit
 fi
@@ -71,24 +71,31 @@ pid=$(echo $line |cut -f4 -d' '| cut -f1 -d'/')
 
 start=$(date "+%s")
 secs=0
-if [[ $count > 0 ]]; then
+if [[ $count -gt 0 ]]; then
   while [[ true ]]; do
     sleep $SLEEP_TIME;
     secs=$(( $(date "+%s") - $start ))
     newcount=$(netstat -apnt 2>/dev/null |grep -E "$src\s+$dst\s+ESTABLISHED\s+$pid/" |awk '{print $2}')
     if [[ $count == $newcount ]]; then
         # pause or network is dead
-        trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount\tFROZEN $secs secs"
         if [[ $count == 0 ]]; then
-            if [[ $(is_net_alive) == 0 ]]; then
-                # the network is dead
-                # wget 'http://127.0.0.1/cgi-bin/do?cmd=main_screen'; rm -f 'do?cmd=main_screen'
-                if [[  $secs > $TIMEOUT ]]; then
-                    kill -15 $pid
-                    trace "Signal sent"
-                    break
-                fi
+            LIMIT=$TIMEOUT
+            net_alive=$(is_net_alive)
+            if [[ $net_alive == 0 ]]; then
+                trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount\tFROZEN ${secs}s. NET is died"
+            else
+                LIMIT=$(($TIMEOUT + 15))
+                trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount\tFROZEN ${secs}s. NET is alive! Wait for $(($LIMIT-$secs))s more"
             fi
+            # Check for kill the shell proccess
+            if [[  $secs -gt $LIMIT ]]; then
+                # wget 'http://127.0.0.1/cgi-bin/do?cmd=main_screen'; rm -f 'do?cmd=main_screen'
+                kill -15 $pid
+                trace "Signal SIGALRM sent"
+                break
+            fi
+        else
+            trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount\tPAUSE ${secs}s."
         fi
     #elif [[ $newcount == 0 ]]; then
     #    trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount\tNULL!!!!"
@@ -105,14 +112,14 @@ if [[ $count > 0 ]]; then
         trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount"
         if [[ -z $newcount ]]; then
             break
-        elif [[ $newcount > 0 ]]; then
+        elif [[ $newcount -gt 0 ]]; then
             start=$(date "+%s")
         fi
     fi
     count=$newcount
   done
 else
-    trace "$(date -u)\t$count\t$src\t$dst\t$pid\t Nothing..."
+    trace "$(date -u)\tNo long-lived TCP-video socket has been detected"
 fi
 
 sleep $SLEEP_TIME;
