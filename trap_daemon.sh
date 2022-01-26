@@ -18,7 +18,7 @@ function is_net_alive {
 }
 
 function get_socket {
-    netstat -apnt 2>/dev/null |grep /shell |awk '{if($2 > 1000 && $6=="ESTABLISHED"){split($4,fm,"."); split($5,to,"."); if(!(fm[1]==to[1]&& fm[2]==to[2] && fm[3]==to[3])){print $2,$4,$5,$7;}}}'
+    netstat -apnt 2>/dev/null |grep /shell |awk '{if($2 > 5000 && $6=="ESTABLISHED"){split($4,fm,"."); split($5,to,"."); if(!(fm[1]==to[1]&& fm[2]==to[2] && fm[3]==to[3])){print $2,$4,$5,$7;}}}'
 }
 
 function trace {
