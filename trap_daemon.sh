@@ -106,7 +106,7 @@ if [[ $count -gt 0 ]]; then
             # wget 'http://127.0.0.1/cgi-bin/do?cmd=ir_code&ir_code=E11EBF00' >/dev/null 2>&1
             # trace "============================= Pause send ================================"
             # rm -f do\?cmd*
-            # ################## It doesn't working while net is dead. Player will do it only after socket's reconnect
+            ################### It doesn't working while net is dead. Player will do it only after socket's reconnect
     #    fi
     else
         trace "$(date -u)\t$count\t$src\t$dst\t$pid\t$newcount"
